@@ -4,8 +4,8 @@
 | ------------- | ----------------------------------------------- |
 | **Version**   | 1.0                                             |
 | **Status**    | Final                                           |
-| **Author**    | Rio                                             |
-| **Created**   | 11 Maret 2026                                   |
+| **Author**    | Kernix                                          |
+| **Created**   | 12 Maret 2026                                   |
 | **Tech Stack**| TanStack Start · PostgreSQL · MySQL · MariaDB · Docker · Gemini AI|
 
 ---
@@ -1315,7 +1315,7 @@ DROP USER IF EXISTS 'sb_a1b2x8'@'%';
 
 ## 14. Timeline & Milestones
 
-### Phase 1 — Foundation (Week 1: 11-15 Mar)
+### Phase 1 — Foundation (Week 1: 12-15 Mar)
 | Task | Duration | Deliverable |
 |------|----------|-------------|
 | PRD finalization | 1 hari | Dokumen PRD final ✅ |
