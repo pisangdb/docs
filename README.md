@@ -6,6 +6,7 @@
 | **Status**    | Final                                           |
 | **Author**    | Kernix                                          |
 | **Created**   | 12 Maret 2026                                   |
+| **Teams**     | Satriyo @satrijo, Rizky @kidutpapuy, Trisna @trisna14 |
 | **Tech Stack**| TanStack Start · PostgreSQL · MySQL · MariaDB · Docker · Gemini AI|
 
 ---
