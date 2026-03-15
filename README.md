@@ -326,7 +326,7 @@ Untuk developer dengan laptop spesifikasi terbatas (8GB RAM), ini sangat terasa 
 |----|-------|----------|
 | US-01 | Sebagai user baru, saya ingin mendaftar akun agar bisa menggunakan PisangDB | **Must** |
 | US-02 | Sebagai user, saya ingin login dengan email & password agar bisa mengakses dashboard | **Must** |
-| US-03 | Sebagai user, saya ingin login dengan OAuth (GitHub) agar lebih cepat masuk | **Should** |
+| US-03 | Sebagai user, saya ingin login dengan OAuth (Google) agar lebih cepat masuk | **Should** |
 
 ### Sandbox Management
 | ID | Story | Priority |
@@ -380,8 +380,9 @@ Untuk developer dengan laptop spesifikasi terbatas (8GB RAM), ini sangat terasa 
 - Rate limit: Max **5 failed attempts** per 15 menit per IP
 
 #### 6.1.3 OAuth (Should Have)
-- Login via **GitHub OAuth** untuk mempercepat onboarding developer
+- Login via **Google OAuth** untuk mempercepat onboarding developer
 - Auto-create account jika belum terdaftar
+- Aktif secara otomatis jika `GOOGLE_CLIENT_ID` dan `GOOGLE_CLIENT_SECRET` di-set di environment
 
 #### 6.1.4 Authorization
 - Setiap user hanya bisa mengakses sandbox miliknya sendiri
@@ -759,7 +760,7 @@ services:
       POSTGRES_SANDBOX_URL: postgresql://pisang:***@postgres:5432/postgres
       MYSQL_SANDBOX_URL: mysql://root:***@mysql:3306
       MARIADB_SANDBOX_URL: mysql://root:***@mariadb:3307
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      # AI_API_KEY: ${AI_API_KEY}  # TBD: Gemini atau OpenRouter
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL}
 
@@ -846,49 +847,60 @@ Worker harus mengelola cleanup **multi-engine** — routing DROP command ke cont
 ├──────────────┤       ├────────────────────┤       ├──────────────────┤
 │ id (PK)      │──┐    │ id (PK)            │──┐    │ id (PK)          │
 │ email        │  │    │ user_id (FK)       │  │    │ sandbox_id (FK)  │
-│ password_hash│  └──▶│ engine             │  └──▶│ user_id (FK)     │
-│ name         │       │ region             │       │ prompt           │
-│ role         │       │ db_name            │       │ response         │
-│ created_at   │       │ db_user            │       │ sql_generated    │
-│ updated_at   │       │ db_password        │       │ executed         │
-└──────────────┘       │ connection_url     │       │ created_at       │
-                       │ host               │       └──────────────────┘
-                       │ port               │
-                       │ display_name       │
-                       │ status             │
-                       │ template_id (FK)   │       ┌──────────────────┐
-                       │ max_size_mb        │       │   templates      │
-                       │ created_at         │       ├──────────────────┤
-                       │ expired_at         │       │ id (PK)          │
-                       │ updated_at         │       │ name             │
-                       └────────────────────┘       │ description      │
-                                                    │ engine           │
-                       ┌────────────────────┐       │ ddl_sql          │
-                       │   query_history    │       │ seed_sql         │
+│ name         │  └──▶│ engine             │  └──▶│ user_id (FK)     │
+│ email_verified│      │ region             │       │ prompt           │
+│ image        │       │ db_name            │       │ response         │
+│ role         │       │ db_user            │       │ sql_generated    │
+│ created_at   │       │ db_password        │       │ executed         │
+│ updated_at   │       │ connection_url     │       │ created_at       │
+└──────────────┘       │ host               │       └──────────────────┘
+       │               │ port               │
+       │  (better-auth)│ display_name       │
+       ▼               │ status             │
+┌──────────────┐       │ template_id (FK)   │       ┌──────────────────┐
+│   sessions   │       │ max_size_mb        │       │   templates      │
+├──────────────┤       │ created_at         │       ├──────────────────┤
+│ id (PK)      │       │ expired_at         │       │ id (PK)          │
+│ user_id (FK) │       │ updated_at         │       │ name             │
+│ token        │       └────────────────────┘       │ description      │
+│ expires_at   │                                    │ engine           │
+│ ...          │       ┌────────────────────┐       │ ddl_sql          │
+└──────────────┘       │   query_history    │       │ seed_sql         │
                        ├────────────────────┤       │ is_builtin       │
-                       │ id (PK)            │       │ user_id (FK)     │
-                       │ sandbox_id (FK)    │       │ created_at       │
-                       │ query              │       └──────────────────┘
-                       │ status             │
-                       │ execution_time_ms  │
-                       │ rows_affected      │
-                       │ error_message      │
-                       │ created_at         │
-                       └────────────────────┘
+┌──────────────┐       │ id (PK)            │       │ user_id (FK)     │
+│   accounts   │       │ sandbox_id (FK)    │       │ created_at       │
+├──────────────┤       │ query              │       └──────────────────┘
+│ id (PK)      │       │ status             │
+│ user_id (FK) │       │ execution_time_ms  │
+│ provider     │       │ rows_affected      │
+│ password     │       │ error_message      │
+│ ...          │       │ created_at         │
+└──────────────┘       └────────────────────┘
+
+┌──────────────────┐
+│  verifications   │
+├──────────────────┤
+│ id (PK)          │
+│ identifier       │
+│ value            │
+│ expires_at       │
+│ created_at       │
+└──────────────────┘
 ```
 
 ### 9.2 Table Definitions
 
 #### `users`
+> Dikelola oleh **better-auth**. Kolom `password` disimpan di tabel `accounts`, bukan di sini.
+
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
-| `id` | `UUID` | PK, DEFAULT gen_random_uuid() | Unique identifier |
+| `id` | `TEXT` | PK (better-auth managed) | Unique identifier |
 | `email` | `VARCHAR(255)` | UNIQUE, NOT NULL | Email login |
-| `password_hash` | `VARCHAR(255)` | NOT NULL | Bcrypt hashed password |
 | `name` | `VARCHAR(100)` | NOT NULL | Display name |
+| `email_verified` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | Email verification status |
+| `image` | `TEXT` | NULLABLE | Profile picture URL |
 | `role` | `VARCHAR(20)` | NOT NULL, DEFAULT 'user' | `user` \| `admin` |
-| `github_id` | `VARCHAR(50)` | UNIQUE, NULLABLE | GitHub OAuth ID |
-| `avatar_url` | `TEXT` | NULLABLE | Profile picture URL |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Registration time |
 | `updated_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Last update |
 
@@ -896,7 +908,7 @@ Worker harus mengelola cleanup **multi-engine** — routing DROP command ke cont
 | Column | Type | Constraints | Description |
 |--------|------|-------------|-------------|
 | `id` | `UUID` | PK, DEFAULT gen_random_uuid() | Unique identifier |
-| `user_id` | `UUID` | FK → users.id, NOT NULL | Owner |
+| `user_id` | `TEXT` | FK → users.id, NOT NULL | Owner |
 | `engine` | `VARCHAR(20)` | NOT NULL | `postgresql` \| `mysql` \| `mariadb` |
 | `region` | `VARCHAR(10)` | NOT NULL, DEFAULT 'id' | Region code: `id` \| `sg` \| `us` \| `eu` |
 | `db_name` | `VARCHAR(63)` | UNIQUE, NOT NULL | Database name pada engine container |
@@ -925,7 +937,7 @@ Worker harus mengelola cleanup **multi-engine** — routing DROP command ke cont
 |--------|------|-------------|-------------|
 | `id` | `UUID` | PK, DEFAULT gen_random_uuid() | Unique identifier |
 | `sandbox_id` | `UUID` | FK → sandboxes.id, NOT NULL | Target sandbox |
-| `user_id` | `UUID` | FK → users.id, NOT NULL | Requesting user |
+| `user_id` | `TEXT` | FK → users.id, NOT NULL | Requesting user |
 | `prompt` | `TEXT` | NOT NULL | User's natural language prompt |
 | `response` | `TEXT` | NOT NULL | Full AI response |
 | `sql_generated` | `TEXT` | NULLABLE | Extracted SQL from response |
@@ -955,7 +967,7 @@ Worker harus mengelola cleanup **multi-engine** — routing DROP command ke cont
 | `ddl_sql` | `TEXT` | NOT NULL | CREATE TABLE statements |
 | `seed_sql` | `TEXT` | NULLABLE | INSERT statements for sample data |
 | `is_builtin` | `BOOLEAN` | NOT NULL, DEFAULT FALSE | System template vs user-created |
-| `user_id` | `UUID` | FK → users.id, NULLABLE | NULL for built-in templates |
+| `user_id` | `TEXT` | FK → users.id, NULLABLE | NULL for built-in templates |
 | `created_at` | `TIMESTAMPTZ` | NOT NULL, DEFAULT NOW() | Creation time |
 
 ---
@@ -964,14 +976,16 @@ Worker harus mengelola cleanup **multi-engine** — routing DROP command ke cont
 
 ### 10.1 Authentication Endpoints
 
+Auth dihandle sepenuhnya oleh **better-auth** melalui catch-all route `/api/auth/*` (`src/routes/api/auth/$.ts`). Endpoint internal yang digunakan better-auth antara lain:
+
 | Method | Endpoint | Description | Auth |
 |--------|----------|-------------|------|
-| `POST` | `/api/auth/register` | Register user baru | No |
-| `POST` | `/api/auth/login` | Login dan dapatkan session | No |
-| `POST` | `/api/auth/logout` | Hapus session | Yes |
-| `GET` | `/api/auth/me` | Get current user profile | Yes |
-| `GET` | `/api/auth/github` | Initiate GitHub OAuth | No |
-| `GET` | `/api/auth/github/callback` | Handle OAuth callback | No |
+| `POST` | `/api/auth/sign-in/email` | Login dengan email & password | No |
+| `POST` | `/api/auth/sign-up/email` | Register user baru | No |
+| `POST` | `/api/auth/sign-out` | Hapus session | Yes |
+| `GET` | `/api/auth/get-session` | Get current session & user | Yes |
+| `GET` | `/api/auth/sign-in/google` | Initiate Google OAuth | No |
+| `GET` | `/api/auth/callback/google` | Handle Google OAuth callback | No |
 
 ### 10.2 Sandbox Endpoints
 
