@@ -375,7 +375,7 @@ Untuk developer dengan laptop spesifikasi terbatas (8GB RAM), ini sangat terasa 
 
 #### 6.1.2 Login
 - Login dengan email + password
-- Session management menggunakan **HTTP-only secure cookies** dengan JWT
+- Session management menggunakan **better-auth** (session-based, HTTP-only cookies)
 - Token expiry: **7 hari** (auto-refresh)
 - Rate limit: Max **5 failed attempts** per 15 menit per IP
 
@@ -630,8 +630,8 @@ Untuk developer dengan laptop spesifikasi terbatas (8GB RAM), ini sangat terasa 
 | **Database (Sandbox)** | PostgreSQL 16 + MySQL 8 + MariaDB 11 | Multi-engine support via Docker containers |
 | **ORM** | Drizzle ORM | Type-safe, lightweight, great DX with PostgreSQL |
 | **Database Driver** | pg + mysql2 | Native drivers untuk PostgreSQL dan MySQL/MariaDB |
-| **Auth** | Custom JWT + bcrypt | Simple, full control, sesuai kebutuhan MVP |
-| **AI** | Google Gemini API | Generous free tier, kualitas output SQL bagus |
+| **Auth** | better-auth | Session-based auth, email/password + Google OAuth |
+| **AI** | TBD (Gemini / OpenRouter) | Belum final — keduanya dipertimbangkan |
 | **SQL Editor** | CodeMirror 6 | Extensible, modern, great SQL support |
 | **Deployment** | Docker + Docker Compose | Konsisten environment, easy deployment |
 | **CI/CD** | GitHub Actions | Automasi build, test, deploy ke VPS |
@@ -760,7 +760,8 @@ services:
       MYSQL_SANDBOX_URL: mysql://root:***@mysql:3306
       MARIADB_SANDBOX_URL: mysql://root:***@mariadb:3307
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      JWT_SECRET: ${JWT_SECRET}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
 
   postgres:
     image: postgres:16-alpine
@@ -1195,7 +1196,7 @@ User mendaftar / login
 
 ### 12.1 Authentication Security
 - Password hashing: **bcrypt** dengan cost factor ≥ 10
-- JWT disimpan dalam **HTTP-only, Secure, SameSite=Strict cookies**
+- Session disimpan dalam **HTTP-only, Secure, SameSite=Strict cookies** (managed by better-auth)
 - CSRF protection via SameSite cookie + Origin header validation
 - Rate limiting pada login: **5 attempts / 15 menit / IP**
 
@@ -1322,7 +1323,7 @@ DROP USER IF EXISTS 'sb_a1b2x8'@'%';
 | PRD finalization | 1 hari | Dokumen PRD final ✅ |
 | Project setup (TanStack Start + Docker + PostgreSQL) | 1 hari | Boilerplate running |
 | Database schema + Drizzle ORM setup | 1 hari | Migrations ready |
-| Auth system (register, login, JWT, middleware) | 2 hari | Auth flow working |
+| Auth system (register, login, better-auth, middleware) | 2 hari | Auth flow working |
 
 ### Phase 2 — Core Engine (Week 2: 16-22 Mar)
 | Task | Duration | Deliverable |
